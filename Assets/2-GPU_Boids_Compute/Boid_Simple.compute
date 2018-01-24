@@ -1,0 +1,96 @@
+﻿#pragma kernel CSMain
+#define GROUP_SIZE 256
+
+#include "UnityCG.cginc"
+
+float hash( float n )
+{
+	return frac(sin(n)*43758.5453);
+}
+
+// The noise function returns a value in the range -1.0f -> 1.0f
+float noise1( float3 x )
+{
+	float3 p = floor(x);
+	float3 f = frac(x);
+
+	f       = f*f*(3.0-2.0*f);
+	float n = p.x + p.y*57.0 + 113.0*p.z;
+
+	return lerp(lerp(lerp( hash(n+0.0), hash(n+1.0),f.x),
+					lerp( hash(n+57.0), hash(n+58.0),f.x),f.y),
+				lerp(lerp( hash(n+113.0), hash(n+114.0),f.x),
+					lerp( hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);
+}
+
+struct Boid
+{
+	float3 position;
+	float3 direction;
+	float noise_offset;
+};
+
+RWStructuredBuffer<Boid> boidBuffer;
+
+CBUFFER_START(Params)
+	float DeltaTime;
+	float RotationSpeed;
+	float BoidSpeed;
+	float BoidSpeedVariation;
+	float3 FlockPosition;
+	float NeighbourDistance;
+	int BoidsCount;
+CBUFFER_END
+
+[numthreads(GROUP_SIZE,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+	Boid boid = boidBuffer[id.x];
+
+	float noise = clamp(noise1(_Time / 100.0 + boid.noise_offset), -1, 1) * 2.0 - 1.0;
+	float velocity = BoidSpeed * (1.0 + noise * BoidSpeedVariation);
+
+	float3 pos = boid.position;
+	float3 rot = boid.direction;
+
+	float3 separation = float3(0, 0.0, 0);
+	float3 alignment = float3(0.0, 0.0, 0.0);
+	float3 cohesion = FlockPosition;
+
+	uint nearbyCount = 1; // Add self that is ignored in loop
+
+	for (int i = 0; i < BoidsCount; i++)
+	{
+		if (i != int(id.x))
+		{
+			Boid tempBoid = boidBuffer[i];
+			if (distance(boid.position, tempBoid.position) < NeighbourDistance)
+			{
+				float3 diff = boid.position - tempBoid.position;
+				// float diffLen = (diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+				float diffLen = (length(diff));
+				float scaler = clamp(1.0 - diffLen / NeighbourDistance, 0.0, 1.0);
+				separation += diff * (scaler / diffLen);
+				
+				alignment += tempBoid.direction;
+				cohesion += tempBoid.position;
+				nearbyCount++;
+			}
+		}
+	}
+
+	float avg = 1.0 / nearbyCount;
+	alignment *= avg;
+	cohesion *= avg;
+	cohesion = normalize(cohesion - boid.position);
+
+	float3 direction = alignment + separation + cohesion;
+
+	float ip = exp(-RotationSpeed * DeltaTime);
+	boid.direction = lerp((direction), normalize(boid.direction), ip);
+
+	boid.position += (boid.direction) * (velocity * DeltaTime);
+
+	boidBuffer[id.x] = boid;
+}
+

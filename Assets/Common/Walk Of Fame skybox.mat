@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 3
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_Name: Walk Of Fame skybox
+  m_Shader: {fileID: 4800000, guid: 5e0363634170e4adfacfcdb48cf194af, type: 3}
+  m_ShaderKeywords: []
+  m_CustomRenderQueue: -1
+  m_SavedProperties:
+    serializedVersion: 2
+    m_TexEnvs: {}
+    m_Floats:
+      data:
+        first:
+          name: _Intensity
+        second: 1
+    m_Colors:
+      data:
+        first:
+          name: _SHAr
+        second: {r: .312602133, g: .0481133349, b: -.0658104345, a: .641293108}
+      data:
+        first:
+          name: _SHAg
+        second: {r: .286417633, g: .173308149, b: -.0618516393, a: .596976995}
+      data:
+        first:
+          name: _SHAb
+        second: {r: .237915561, g: .397836357, b: -.0621705018, a: .641477406}
+      data:
+        first:
+          name: _SHBr
+        second: {r: -.141452298, g: .00759834098, b: -.317703187, a: -.129272699}
+      data:
+        first:
+          name: _SHBg
+        second: {r: -.0672449693, g: -.0016070907, b: -.278647214, a: -.129255682}
+      data:
+        first:
+          name: _SHBb
+        second: {r: .0055519212, g: -.0128071541, b: -.274035752, a: -.129693493}
+      data:
+        first:
+          name: _SHC
+        second: {r: .253520846, g: .172574505, b: .0737705827, a: 0}

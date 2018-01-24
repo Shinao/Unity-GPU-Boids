@@ -1,0 +1,131 @@
+﻿#pragma kernel ComputeMultilateration
+#pragma kernel Move
+#define GROUP_SIZE 256
+
+#include "UnityCG.cginc"
+
+float hash( float n )
+{
+	return frac(sin(n)*43758.5453);
+}
+
+// The noise function returns a value in the range -1.0f -> 1.0f
+float noise1( float3 x )
+{
+	float3 p = floor(x);
+	float3 f = frac(x);
+
+	f       = f*f*(3.0-2.0*f);
+	float n = p.x + p.y*57.0 + 113.0*p.z;
+
+	return lerp(lerp(lerp( hash(n+0.0), hash(n+1.0),f.x),
+					lerp( hash(n+57.0), hash(n+58.0),f.x),f.y),
+				lerp(lerp( hash(n+113.0), hash(n+114.0),f.x),
+					lerp( hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);
+}
+
+struct Boid
+{
+	float3 position;
+	float3 direction;
+	float noise_offset;
+	float distance_to_station[4];
+	float padding; // Align to 16 bytes
+};
+
+RWStructuredBuffer<Boid> boidBuffer;
+
+CBUFFER_START(Params) 
+	float DeltaTime;
+	float RotationSpeed;
+	float BoidSpeed;
+	float BoidSpeedVariation;
+	float3 FlockPosition;
+	float NeighbourDistance;
+	int BoidsCount;
+	float Test;
+CBUFFER_END
+
+[numthreads(1,1,1)]
+void ComputeMultilateration(uint3 id : SV_DispatchThreadID)
+{
+	float3 station_to_position[4] = {float3(500.0, 1000.0, 0), float3(-500.0, 500.0, -500.0), float3(0.0, 500.0, 500.0), float3(0.0, -500.0, 0)};
+	Boid boid = boidBuffer[id.x];
+
+	float3 pos = boid.position;
+	float distance_to_station[4] = boid.distance_to_station;
+
+
+	for (int i = 0; i < 4; i++)
+		distance_to_station[i] = distance(pos, station_to_position[i]);
+
+	boid.distance_to_station = distance_to_station;
+	boidBuffer[id.x] = boid;
+}
+
+bool AreBoidsCloseBy(const float boid1_distance_to_station[4], const float boid2_distance_to_station[4], const float max_distance) {
+	for (int i = 0; i < 4; i++) 
+	{
+		if (abs(boid1_distance_to_station[i] - boid2_distance_to_station[i]) > max_distance)
+			return false;
+	}
+	return true;
+}
+
+[numthreads(GROUP_SIZE,1,1)]
+void Move(uint3 id : SV_DispatchThreadID)
+{
+	uint instanceId = id.x;
+	Boid boid = boidBuffer[instanceId];
+
+	float noise = clamp(noise1(_Time / 100.0 + boid.noise_offset), -1, 1) * 2.0 - 1.0;
+	float velocity = BoidSpeed * (1.0 + noise * BoidSpeedVariation);
+
+	float3 boid_pos = boid.position;
+	float3 boid_dir = boid.direction;
+	const float boid_distance_to_station[4] = boid.distance_to_station;
+
+	float3 separation = float3(0, 0.0, 0);
+	float3 alignment = float3(0.0, 0.0, 0.0);
+	float3 cohesion = FlockPosition;
+
+    float tempSpeed = 0;
+	int nearbyCount = 1; // Add self that is ignored in loop
+
+	for (int i = 0; i < BoidsCount; i++) {
+		if (i == instanceId)
+			continue;
+
+		if (AreBoidsCloseBy(boidBuffer[i].distance_to_station, boid_distance_to_station, NeighbourDistance))
+		{
+			if (distance(boid_pos, boidBuffer[i].position) < NeighbourDistance)
+			{
+				float3 tempBoid_position = boidBuffer[i].position;
+
+				float3 diff = boid_pos - tempBoid_position;
+				float diffLen = (length(diff));
+				float scaler = clamp(1.0 - diffLen / NeighbourDistance, 0.0, 1.0);
+				
+				separation += diff * (scaler / diffLen);
+				alignment += boidBuffer[i].direction;
+				cohesion += tempBoid_position;
+
+				nearbyCount += 1;
+			}
+		}
+	}
+
+	float avg = 1.0 / nearbyCount;
+	alignment *= avg;
+	cohesion *= avg;
+	cohesion = normalize(cohesion - boid_pos);
+
+	float3 direction = alignment + separation + cohesion;
+
+	float ip = exp(-RotationSpeed * DeltaTime);
+	boid.direction = lerp((direction), normalize(boid_dir), ip);
+
+	boid.position += (boid.direction) * (velocity * DeltaTime);
+
+	boidBuffer[id.x] = boid;
+}

@@ -1,0 +1,240 @@
+﻿#pragma kernel Move
+#pragma kernel PrepareNextFrame
+#define GROUP_SIZE 256
+#define MAX_DIM_GROUPS 1024
+#define MAX_DIM_THREADS (GROUP_SIZE * MAX_DIM_GROUPS)
+#pragma kernel BitonicSort
+#pragma kernel InitBitonicSort
+
+#include "UnityCG.cginc"
+
+struct Boid
+{
+	float3 position;
+	float3 position_for_parallelism;
+	float3 direction;
+	float3 direction_for_parallelism;
+	float noise_offset;
+	float distance_to_station;
+	float2 padding; // Align to 16 bytes
+};
+
+RWStructuredBuffer<Boid> Boids;
+
+RWStructuredBuffer<float> TestBuffer;
+
+RWStructuredBuffer<uint> Keys;
+RWStructuredBuffer<float> Values;
+RWStructuredBuffer<uint> ValueIdxToKeyIdx;
+RWStructuredBuffer<float4> PositionRankedByDistance;
+RWStructuredBuffer<float4> DirectionRankedByDistance;
+
+CBUFFER_START(Params) 
+	uint BoidsCount;
+	float BoidSpeed;
+	float NeighbourDistance;
+	float DeltaTime;
+	float RotationSpeed;
+	float BoidSpeedVariation;
+	float3 FlockPosition;
+	float Test;
+CBUFFER_END
+
+float hash(float n)
+{
+	return frac(sin(n)*43758.5453);
+}
+
+// The noise function returns a value in the range -1.0f -> 1.0f
+float noise1(float3 x)
+{
+	float3 p = floor(x);
+	float3 f = frac(x);
+
+	f       = f*f*(3.0-2.0*f);
+	float n = p.x + p.y*57.0 + 113.0*p.z;
+
+	return lerp(lerp(lerp( hash(n+0.0), hash(n+1.0),f.x),
+					lerp( hash(n+57.0), hash(n+58.0),f.x),f.y),
+				lerp(lerp( hash(n+113.0), hash(n+114.0),f.x),
+					lerp( hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);
+}
+
+[numthreads(GROUP_SIZE,1,1)]
+void PrepareNextFrame(uint3 id : SV_DispatchThreadID)
+{
+	Boid boid = Boids[id.x];
+
+	float3 boid_position = boid.position;
+
+	// Used for fast access
+	PositionRankedByDistance[id.x] = float4(Boids[Keys[id.x]].position, 0); // We are setting another boid rank because of GPU access limitation but an another thread will set ours
+	DirectionRankedByDistance[id.x] = float4(Boids[Keys[id.x]].direction, 0); // We are setting another boid rank because of GPU access limitation but an another thread will set ours
+
+	boid.position_for_parallelism = boid_position;
+	boid.direction_for_parallelism = boid.direction;
+
+	Boids[id.x] = boid;
+}
+
+uint getClosestRankForDistance(float search, int first, int last) // Cannot set to uint or it crashes...
+{
+	uint middle;
+	while (first <= last) {
+		middle = (first + last) / 2;
+
+		if (Values[Keys[middle]] < search)
+			first = middle + 1;
+		else
+			last = middle - 1;
+	}
+ 
+   return first;
+}
+
+[numthreads(GROUP_SIZE,1,1)]
+void Move(uint3 id : SV_DispatchThreadID)
+{
+	uint instanceId = id.x;
+	Boid boid = Boids[instanceId];
+
+	float noise = clamp(noise1(_Time / 100.0 + boid.noise_offset), -1, 1) * 2.0 - 1.0;
+	float velocity = BoidSpeed * (1.0 + noise * BoidSpeedVariation);
+
+	float3 boid_pos = boid.position_for_parallelism;
+	float3 boid_dir = boid.direction_for_parallelism;
+	float boid_distance_to_station = boid.distance_to_station;
+
+	float3 separation = float3(0.0, 0.0, 0.0);
+	float3 alignment = float3(0.0, 0.0, 0.0);
+	float3 cohesion = FlockPosition;
+
+	int nearbyCount = 1; // Add self that is ignored in loop
+
+	if (_Time.y == 0)
+		TestBuffer[instanceId] = 2;
+	else
+		TestBuffer[instanceId] = _Time.y;
+
+	//// Binary search on our bitonic sorting
+	uint boidRank = ValueIdxToKeyIdx[instanceId];
+	float minDistanceToBoid = boid_distance_to_station - NeighbourDistance;
+	uint rankMinDistance = getClosestRankForDistance(minDistanceToBoid, 0, boidRank);
+	float maxDistanceToBoid = boid_distance_to_station + NeighbourDistance;
+	uint rankMaxDistance = getClosestRankForDistance(maxDistanceToBoid, boidRank, BoidsCount - 1);
+	rankMinDistance = max(rankMinDistance - 1, 0); // Fix search algorithm can take one off
+	rankMaxDistance = min(rankMaxDistance + 1, BoidsCount - 1); // Fix search algorithm can take one off
+	uint rankMaxDistancePlusOne = rankMaxDistance + 1;
+
+	////////
+	//// Toggle between this version and the one below
+	//// For some reason this one is slower above 16k BoidsCount but faster below (Memory cache reached on GPU per thread? I have no idea)
+	//// For 32k boids this will loop for around ~4k (Max 10k depending on boid position)
+	////////
+	// for (uint i = 0; i < BoidsCount; i++) { // Faster : Use a constant of iterations each frame seems better than to change it even if it's 10x less...
+	for (uint i = rankMinDistance; i < rankMaxDistancePlusOne; i++) { // Same behaviour but slower though less iterations...
+		if (i == boidRank)
+			continue;
+	
+		// TestBuffer[instanceId] += 1;;
+
+		if (distance(boid_pos, PositionRankedByDistance[i].xyz) < NeighbourDistance)
+		{
+			float3 tempBoid_position = PositionRankedByDistance[i].xyz;
+			float3 diff = boid_pos - tempBoid_position;
+			float diffLen = (length(diff));
+			float scaler = clamp(1.0 - diffLen / NeighbourDistance, 0.0, 1.0);
+			
+			separation += diff * (scaler / diffLen);
+			alignment += Boids[Keys[i]].direction_for_parallelism; // If I use DirectionRankedByDistance[i] instead it becomes 2x slower...
+			cohesion += tempBoid_position;
+
+			nearbyCount += 1;
+		}
+	}
+
+	////////
+	//// Toggle between this version and the one aboe
+	//// For some reason this one is faster
+	//// This will loop BoidsCount time : 32k boids -> 32k iterations
+	////////
+	// for (int i = 0; i < BoidsCount; i++) {
+	// 	if (i == instanceId)
+	// 		continue;
+			
+	// 	// TestBuffer[instanceId] += 1;
+
+	// 	if (distance(boid_pos, Boids[i].position_for_parallelism) < NeighbourDistance)
+	// 	{
+	// 		float3 tempBoid_position = Boids[i].position_for_parallelism;
+
+	// 		float3 diff = boid_pos - tempBoid_position;
+	// 		float diffLen = (length(diff));
+	// 		float scaler = clamp(1.0 - diffLen / NeighbourDistance, 0.0, 1.0);
+			
+	// 		separation += diff * (scaler / diffLen);
+	// 		alignment += Boids[i].direction_for_parallelism;
+	// 		cohesion += tempBoid_position;
+
+	// 		nearbyCount += 1;
+	// 	}
+	// }
+
+	float avg = 1.0 / nearbyCount;
+	alignment *= avg;
+	cohesion *= avg;
+	cohesion = normalize(cohesion - boid_pos);
+
+	float3 direction = alignment + separation + cohesion;
+
+	float ip = exp(-RotationSpeed * DeltaTime);
+	boid.direction = lerp((direction), normalize(boid_dir), ip);
+
+	boid.position += (boid.direction) * (velocity * DeltaTime);
+
+	Boids[id.x] = boid;
+}
+
+//// Bitonic Sorting
+int block;
+int dim;
+uint count;
+
+[numthreads(GROUP_SIZE,1,1)]
+void BitonicSort(uint3 id : SV_DispatchThreadID) {
+	uint i = id.x + id.y * MAX_DIM_THREADS;
+	uint j = i^block;
+	
+	if (j < i || i >= count) 
+		return;
+	
+	uint key_i = Keys[i];
+	uint key_j = Keys[j];
+	float value_i = Values[key_i];
+	float value_j = Values[key_j];
+	
+	float diff = (value_i - value_j) * ((i&dim) == 0 ? 1 : -1);
+	if (diff > 0) {
+		Keys[i] = key_j;
+		Keys[j] = key_i;
+		ValueIdxToKeyIdx[key_i] = j;
+		ValueIdxToKeyIdx[key_j] = i;
+	}
+}
+
+[numthreads(GROUP_SIZE,1,1)]
+void InitBitonicSort(uint3 id : SV_DispatchThreadID) {
+	uint i = id.x + id.y * MAX_DIM_THREADS;
+	if (i < count) {
+		Keys[i] = i;
+		ValueIdxToKeyIdx[i] = i;
+
+		Boid boid = Boids[id.x];
+		float3 boid_position = boid.position;
+		float3 station_to_position = float3(0.0, 0.0, 0.0);
+		boid.distance_to_station = distance(boid_position, station_to_position);
+		Boids[id.x] = boid;
+
+		Values[i] = boid.distance_to_station;
+	}
+}
