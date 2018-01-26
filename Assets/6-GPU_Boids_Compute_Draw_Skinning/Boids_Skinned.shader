@@ -43,6 +43,7 @@ Shader "BoidFlockSkinned" { // StructuredBuffer + SurfaceShader
 
         float4x4 _LookAtMatrix;
         float3 _BoidPosition;
+        int _CurrentFrame;
 
          #ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
             struct Boid
@@ -50,7 +51,9 @@ Shader "BoidFlockSkinned" { // StructuredBuffer + SurfaceShader
                 float3 position;
                 float3 direction;
                 float noise_offset;
-                float3 padding;
+                float speed;
+                float frame;
+                // float3 padding;
             };
 
             StructuredBuffer<Boid> boidBuffer; 
@@ -69,12 +72,12 @@ Shader "BoidFlockSkinned" { // StructuredBuffer + SurfaceShader
             );
         }
      
-         void vert(inout appdata_custom v)
+        void vert(inout appdata_custom v)
         {
             // UNITY_INITIALIZE_OUTPUT(Input, data);
 
             #ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
-                v.vertex = vertexAnimation[v.id * 32 + (int)(_Time * 1000 % 32)];
+                v.vertex = vertexAnimation[v.id * 32 + _CurrentFrame];
                 v.vertex = mul(_LookAtMatrix, v.vertex);
                 v.vertex.xyz += _BoidPosition;
             #endif
@@ -85,6 +88,7 @@ Shader "BoidFlockSkinned" { // StructuredBuffer + SurfaceShader
             #ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
                 _BoidPosition = boidBuffer[unity_InstanceID].position;
                 _LookAtMatrix = look_at_matrix(_BoidPosition, _BoidPosition + (boidBuffer[unity_InstanceID].direction * -1), float3(0.0, 1.0, 0.0));
+                _CurrentFrame = boidBuffer[unity_InstanceID].frame;
             #endif
         }
  

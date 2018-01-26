@@ -28,7 +28,9 @@ struct Boid
 	float3 position;
 	float3 direction;
 	float noise_offset;
-	float3 padding; // Weirdly if I align to 16 bytes it's worse I have to add 8 additional bytes... something funky here
+	float speed;
+	float frame;
+	// float3 padding;
 };
 
 RWStructuredBuffer<Boid> boidBuffer;
@@ -93,6 +95,14 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 	boid.direction = lerp((direction), normalize(boid_dir), ip);
 
 	boid.position += (boid.direction) * (velocity * DeltaTime);
+
+
+	// TODO
+	// Check for really slow boids - set min speed
+	// Frame vertex interpolation ?
+	// 32 to variable NbFrames
+	if (boid.direction.y > -0.25) // Check for dive or constant speed or random ?
+		boid.frame = (boid.frame + velocity * (DeltaTime * 10)) % 32;
 
 	boidBuffer[id.x] = boid;
 }

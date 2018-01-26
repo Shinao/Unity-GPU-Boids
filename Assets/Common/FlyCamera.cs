@@ -6,15 +6,11 @@ public class FlyCamera : MonoBehaviour
 {
 	public float minSpeed = 0.5f;
 	public float mainSpeed = 10f; // Regular speed.
-	public float shiftMultiplier = 2f;  // Multiplied by how long shift is held.  Basically running.
-	public float maxShift = 100000f; // Maximum speed when holding shift.
+	public float shiftMultiplier = 2f;  // Multiplied while shift is held.  Basically running.
+	public float ctrlMultiplier = 0.5f;  // Multiplied while control is held.  Basically running.
 	public float camSens = .35f;  // Camera sensitivity by mouse input.
 	private Vector3 lastMouse = new Vector3(Screen.width / 2, Screen.height / 2, 0); // Kind of in the middle of the screen, rather than at the top (play).
-	private float totalRun = 1.0f;
-
 	public bool clickToMove = true;
-	public bool keepItAboveTerrain = true;
-	public float unitsAboveTerrain = 4f;
 
 	void Update()
 	{
@@ -45,21 +41,13 @@ public class FlyCamera : MonoBehaviour
 
 
 		// Keyboard commands.
-			Vector3 p = getDirection();
+		Vector3 p = getDirection();
 		if (Input.GetKey(KeyCode.LeftShift))
-		{
-			//totalRun += Time.deltaTime;
-			totalRun += Time.unscaledDeltaTime;
-			p = p * totalRun * shiftMultiplier;
-			p.x = Mathf.Clamp(p.x, -maxShift, maxShift);
-			p.y = Mathf.Clamp(p.y, -maxShift, maxShift);
-			p.z = Mathf.Clamp(p.z, -maxShift, maxShift);
-		}
+			p = p * mainSpeed * shiftMultiplier;
+		else if (Input.GetKey(KeyCode.LeftControl))
+			p = p * mainSpeed * ctrlMultiplier;
 		else
-		{
-			totalRun = Mathf.Clamp(totalRun * 0.5f, 1f, 1000f);
 			p = p * mainSpeed;
-		}
 
 		//p = p * Time.deltaTime;
 		p = p * Time.unscaledDeltaTime;

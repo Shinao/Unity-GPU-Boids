@@ -7,13 +7,17 @@ public struct GPUBoid_Skinned
     public Vector3 position;
     public Vector3 direction;
     public float noise_offset;
-    public Vector3 padding;
+    public float speed;
+    public float frame;
+    // public Vector3 padding;
 }
 
 public class GPUFlock_Skinned : MonoBehaviour {
     public ComputeShader _ComputeFlock;
 
-    public SkinnedMeshRenderer BoidSMR;
+    private SkinnedMeshRenderer BoidSMR;
+    public GameObject TargetBoidToGPUSkin;
+    private Animator _Animator;
     public AnimationClip _AnimationClip;
 
     public int BoidsCount;
@@ -56,7 +60,7 @@ public class GPUFlock_Skinned : MonoBehaviour {
             this.boidsData[i].noise_offset = Random.value * 1000.0f;
         }
 
-        BoidBuffer = new ComputeBuffer(BoidsCount, 40);
+        BoidBuffer = new ComputeBuffer(BoidsCount, 36);
         BoidBuffer.SetData(this.boidsData);
 
         GenerateSkinnedAnimationForGPUBuffer();
@@ -72,7 +76,6 @@ public class GPUFlock_Skinned : MonoBehaviour {
 
         return boidData;
     }
-    
 
     public float RotationSpeed = 1f;
     public float BoidSpeed = 1f;
@@ -107,11 +110,11 @@ public class GPUFlock_Skinned : MonoBehaviour {
 
     private void GenerateSkinnedAnimationForGPUBuffer()
     {
-        var animator = BoidSMR.GetComponent<Animator>();
+        BoidSMR = TargetBoidToGPUSkin.GetComponentInChildren<SkinnedMeshRenderer>();
+        _Animator = TargetBoidToGPUSkin.GetComponentInChildren<Animator>();
         int iLayer = 0;
         float fNormalizedTime = .5f;
-        //Get Current State
-        AnimatorStateInfo aniStateInfo = animator.GetCurrentAnimatorStateInfo(iLayer);
+        AnimatorStateInfo aniStateInfo = _Animator.GetCurrentAnimatorStateInfo(iLayer);
 
         Mesh bakedMesh = new Mesh();
         int curClipFrame = 0;
@@ -121,10 +124,6 @@ public class GPUFlock_Skinned : MonoBehaviour {
         curClipFrame = Mathf.ClosestPowerOfTwo((int)(_AnimationClip.frameRate * _AnimationClip.length));
         perFrameTime = _AnimationClip.length / curClipFrame;
 
-        // Texture2D animMap = new Texture2D(this.animData.Value.mapWidth, curClipFrame, TextureFormat.RGBAHalf, false);
-        // animMap.name = string.Format("{0}_{1}.animMap", this.animData.Value.name, curAnim.name);
-        // this.animData.Value.AnimationPlay(curAnim.name);
-
         var vertexCount = BoidSMR.sharedMesh.vertexCount;
         VertexAnimationBuffer = new ComputeBuffer(vertexCount * curClipFrame, 16);
         Vector4[] vertexAnimationData = new Vector4[vertexCount * curClipFrame];
@@ -132,10 +131,9 @@ public class GPUFlock_Skinned : MonoBehaviour {
         for (int i = 0; i < curClipFrame; i++)
         {
             Debug.Log("Bake " + i);
-            animator.Play(aniStateInfo.shortNameHash, iLayer,  sampleTime);
-            animator.Update(0f);
+            _Animator.Play(aniStateInfo.shortNameHash, iLayer, sampleTime);
+            _Animator.Update(0f);
 
-        //     animation.Sample();
             BoidSMR.BakeMesh(bakedMesh);
 
             for(int j = 0; j < vertexCount; j++)
@@ -150,5 +148,6 @@ public class GPUFlock_Skinned : MonoBehaviour {
         VertexAnimationBuffer.SetData(vertexAnimationData);
         BoidMaterial.SetBuffer("vertexAnimation", VertexAnimationBuffer);
 
+        TargetBoidToGPUSkin.SetActive(false);
     }
 }
