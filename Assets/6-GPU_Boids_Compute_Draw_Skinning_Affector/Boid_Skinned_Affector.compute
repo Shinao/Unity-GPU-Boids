@@ -35,7 +35,16 @@ struct Boid
 	float padding;
 };
 
+struct Affector
+{
+	float3 position;
+	float force;
+	float distance;
+};
+
 RWStructuredBuffer<Boid> boidBuffer;
+// RWStructuredBuffer<float3> affectorBuffer;
+RWStructuredBuffer<Affector> affectorBuffer;
 
 CBUFFER_START(Params)
 	float DeltaTime;
@@ -47,6 +56,9 @@ CBUFFER_START(Params)
 	uint BoidsCount;
 	float BoidFrameSpeed;
 	int NbFrames;
+	int NbAffectors;
+	float AffectorForce;
+	float AffectorDistance;
 CBUFFER_END
 
 [numthreads(GROUP_SIZE,1,1)]
@@ -59,10 +71,10 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 	float velocity = BoidSpeed * (1.0 + noise * BoidSpeedVariation);
 	
 	// Make slow birds go faster if far away from flock ?
-	// float distance_from_flock = distance(boid.position, FlockPosition);
-	// if (distance_from_flock > 50)
-	// 	velocity += distance_from_flock / 50;
-	// velocity += min(max(distance(boid.position, FlockPosition) / 50, 1), BoidSpeed * 200);
+	float distance_from_flock = distance(boid.position, FlockPosition);
+	if (distance_from_flock > 50)
+		velocity += distance_from_flock / 50;
+	velocity += min(max(distance(boid.position, FlockPosition) / 50, 1), BoidSpeed * 200);
 
 	float3 boid_pos = boid.position;
 	float3 boid_dir = boid.direction;
@@ -93,6 +105,27 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 		}
 	}
 
+	for (uint i = 0; i < NbAffectors; i++) {
+		Affector affector = affectorBuffer[i];
+		// We remove one axis to make a better drawing but ultimately if we want to avoid obstacles or get attracted by something we should use all 3 axis
+		float3 affector_position = FlockPosition - affector.position;
+		if (abs(boid_pos.x - FlockPosition.x) < 20 && distance(boid_pos.yz, affector_position.yz) < (affector.distance + AffectorDistance))
+		// if (distance(boid_pos, affector.position) < affector.distance)
+		{
+
+			float3 diff = boid_pos - float3(boid_pos.x, affector_position.y, affector_position.z);
+			// float3 diff = boid_pos - affector_position;
+			float diffLen = length(diff);
+			float scaler = clamp(1.0 - diffLen / (affector.force + AffectorForce), 0.0, 1.0);
+			
+			if (affector.force < 0)
+				separation += diff * (scaler / diffLen) * affector.force;
+			else
+				separation += diff * (scaler / diffLen);
+		}
+	}
+	
+
 	float avg = 1.0 / nearbyCount;
 	alignment *= avg;
 	cohesion *= avg;
@@ -121,4 +154,3 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
 	boidBuffer[id.x] = boid;
 }
-

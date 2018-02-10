@@ -1,8 +1,9 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
 
-public struct GPUBoid_Skinned
+public struct GPUBoid_Skinned_Affector
 {
     public Vector3 position;
     public Vector3 direction;
@@ -14,7 +15,13 @@ public struct GPUBoid_Skinned
     public float padding;
 }
 
-public class GPUFlock_Skinned : MonoBehaviour {
+public struct GPUAffector {
+    public Vector3 position;
+    public float force;
+    public float distance;
+}
+
+public class GPUFlock_Skinned_Affector : MonoBehaviour {
     public ComputeShader _ComputeFlock;
 
     private SkinnedMeshRenderer BoidSMR;
@@ -32,16 +39,15 @@ public class GPUFlock_Skinned : MonoBehaviour {
 
     private int kernelHandle;
     private ComputeBuffer BoidBuffer;
+    private ComputeBuffer AffectorBuffer;
     private ComputeBuffer VertexAnimationBuffer;
     public Material BoidMaterial;
     ComputeBuffer _drawArgsBuffer;
-    MaterialPropertyBlock _props;
 
     const int GROUP_SIZE = 256;
 
     void Start()
     {
-        // Initialize the indirect draw args buffer.
         _drawArgsBuffer = new ComputeBuffer(
             1, 5 * sizeof(uint), ComputeBufferType.IndirectArguments
         );
@@ -50,23 +56,23 @@ public class GPUFlock_Skinned : MonoBehaviour {
             BoidMesh.GetIndexCount(0), (uint) BoidsCount, 0, 0, 0
         });
 
-        // This property block is used only for avoiding an instancing bug.
-        _props = new MaterialPropertyBlock();
-        _props.SetFloat("_UniqueID", Random.value);
-
         this.boidsData = new GPUBoid_Skinned[this.BoidsCount];
         this.kernelHandle = _ComputeFlock.FindKernel("CSMain");
 
         for (int i = 0; i < this.BoidsCount; i++)
-        {
             this.boidsData[i] = this.CreateBoidData();
-            this.boidsData[i].noise_offset = Random.value * 1000.0f;
-        }
 
         BoidBuffer = new ComputeBuffer(BoidsCount, 48);
         BoidBuffer.SetData(this.boidsData);
 
+        AffectorBuffer = new ComputeBuffer(NbAffectorsPerRay, 20);
+
         GenerateSkinnedAnimationForGPUBuffer();
+
+        var dataToPaths = new PointsFromData();
+        dataToPaths.GetPointsFrom(DrawingAffectors, DrawingAffectorsOffset, new Vector3(0, 90, 0), ReverseYAxisDrawingAffectors, ScaleDrawingAffectors);
+        var pathsToPoints = dataToPaths.PathsToPoints;
+        GenerateDrawingAffectors(dataToPaths.Points.ToArray(), 2, 2);
     }
 
     GPUBoid_Skinned CreateBoidData()
@@ -76,8 +82,76 @@ public class GPUFlock_Skinned : MonoBehaviour {
         Quaternion rot = Quaternion.Slerp(transform.rotation, Random.rotation, 0.3f);
         boidData.position = pos;
         boidData.direction = rot.eulerAngles;
+        boidData.noise_offset = Random.value * 1000.0f;
 
         return boidData;
+    }
+
+    public TextAsset DrawingAffectors;
+    public float ScaleDrawingAffectors = 0.03f;
+    public bool ReverseYAxisDrawingAffectors = true;
+    public Vector3 DrawingAffectorsOffset;
+    public bool DrawDrawingAffectors = true;
+    GPUAffector[] Affectors = new GPUAffector[1];
+    private void GenerateDrawingAffectors(Vector3[] points, float affectorForce, float affectorDistance) {
+        if (AffectorBuffer != null)
+            AffectorBuffer.Release();
+
+        System.Array.Resize(ref Affectors, NbAffectors + points.Length);
+
+        var new_affectors = points.Select(p => {
+            var affector = new GPUAffector();
+            affector.position = p;
+            affector.force = affectorForce;
+            affector.distance = affectorDistance;
+            return affector;
+        }).ToArray();
+
+        System.Array.Copy(new_affectors, 0, Affectors, NbAffectors, new_affectors.Length);
+
+        if (DrawDrawingAffectors) {
+            foreach(var point in points) {
+                var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                go.transform.localScale = new Vector3(1,1,1);
+                go.transform.position = point;
+            }
+        }
+
+        NbAffectors += points.Length;
+
+        AffectorBuffer = new ComputeBuffer(NbAffectors, 20);
+        AffectorBuffer.SetData(Affectors);
+    }
+
+    public float RayAffectorDistance = 100f;
+    public int NbAffectorsPerRay = 100;
+    private int NbAffectors = 0;
+    private void GenerateAffectors(float affectorForce, float affectorDistance) {
+        var flockPosition = Target.transform.position;
+
+        if (AffectorBuffer != null)
+            AffectorBuffer.Release();
+
+        System.Array.Resize(ref Affectors, NbAffectors + NbAffectorsPerRay);
+
+        var rayDirection = Camera.main.ScreenPointToRay(Input.mousePosition).direction;
+        var rayStep = RayAffectorDistance / NbAffectorsPerRay;
+        var rayPosition = Camera.main.transform.position + rayDirection * Vector3.Distance(Camera.main.transform.position, Target.transform.position);
+        for (int i = NbAffectors; i < NbAffectors + NbAffectorsPerRay; i++) {
+            var affector = new GPUAffector();
+            affector.position = rayPosition;
+            affector.force = affectorForce;
+            affector.distance = affectorDistance;
+            Affectors[i] = affector;
+
+            GameObject.CreatePrimitive(PrimitiveType.Sphere).transform.position = rayPosition;
+            
+            rayPosition += rayDirection * rayStep;
+        }
+        NbAffectors += NbAffectorsPerRay;
+
+        AffectorBuffer = new ComputeBuffer(NbAffectors, 20);
+        AffectorBuffer.SetData(Affectors);
     }
 
     public float RotationSpeed = 1f;
@@ -86,8 +160,15 @@ public class GPUFlock_Skinned : MonoBehaviour {
     public float BoidSpeedVariation = 1f;
     public float BoidFrameSpeed = 10f;
     public bool FrameInterpolation = true;
+    public float AffectorForce = 2f;
+    public float AffectorDistance = 2f;
     void Update()
     {
+        // if (Input.GetMouseButtonDown(0))
+        //     GenerateAffectors(-2, 2);
+        // if (Input.GetMouseButtonDown(1))
+        //     GenerateAffectors(2, 2);
+
         _ComputeFlock.SetFloat("DeltaTime", Time.deltaTime);
         _ComputeFlock.SetFloat("RotationSpeed", RotationSpeed);
         _ComputeFlock.SetFloat("BoidSpeed", BoidSpeed);
@@ -97,7 +178,11 @@ public class GPUFlock_Skinned : MonoBehaviour {
         _ComputeFlock.SetFloat("BoidFrameSpeed", BoidFrameSpeed);
         _ComputeFlock.SetInt("BoidsCount", BoidsCount);
         _ComputeFlock.SetInt("NbFrames", NbFrames);
+        _ComputeFlock.SetInt("NbAffectors", NbAffectors);
+        _ComputeFlock.SetFloat("AffectorForce", AffectorForce);
+        _ComputeFlock.SetFloat("AffectorDistance", AffectorDistance);
         _ComputeFlock.SetBuffer(this.kernelHandle, "boidBuffer", BoidBuffer);
+        _ComputeFlock.SetBuffer(this.kernelHandle, "affectorBuffer", AffectorBuffer);
         _ComputeFlock.Dispatch(this.kernelHandle, this.BoidsCount / GROUP_SIZE, 1, 1);
 
         BoidMaterial.SetBuffer("boidBuffer", BoidBuffer);
@@ -112,13 +197,14 @@ public class GPUFlock_Skinned : MonoBehaviour {
         Graphics.DrawMeshInstancedIndirect(
             BoidMesh, 0, BoidMaterial,
             new Bounds(Vector3.zero, Vector3.one * 1000),
-            _drawArgsBuffer, 0, _props
+            _drawArgsBuffer, 0
         );
     }
 
     void OnDestroy()
     {
         if (BoidBuffer != null) BoidBuffer.Release();
+        if (AffectorBuffer != null) AffectorBuffer.Release();
         if (_drawArgsBuffer != null) _drawArgsBuffer.Release();
         if (VertexAnimationBuffer != null) VertexAnimationBuffer.Release();
     }

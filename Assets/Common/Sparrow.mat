@@ -8,7 +8,7 @@ Material:
   m_PrefabInternal: {fileID: 0}
   m_Name: Sparrow
   m_Shader: {fileID: 4800000, guid: a5284f518898dc144b6493219b46fe25, type: 3}
-  m_ShaderKeywords: 
+  m_ShaderKeywords: FRAME_INTERPOLATION
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
