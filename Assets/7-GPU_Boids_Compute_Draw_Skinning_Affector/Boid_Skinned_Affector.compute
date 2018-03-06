@@ -1,0 +1,156 @@
+﻿#pragma kernel CSMain
+#define GROUP_SIZE 256
+
+#include "UnityCG.cginc"
+
+float hash( float n )
+{
+	return frac(sin(n)*43758.5453);
+}
+
+// The noise function returns a value in the range -1.0f -> 1.0f
+float noise1( float3 x )
+{
+	float3 p = floor(x);
+	float3 f = frac(x);
+
+	f       = f*f*(3.0-2.0*f);
+	float n = p.x + p.y*57.0 + 113.0*p.z;
+
+	return lerp(lerp(lerp( hash(n+0.0), hash(n+1.0),f.x),
+					lerp( hash(n+57.0), hash(n+58.0),f.x),f.y),
+				lerp(lerp( hash(n+113.0), hash(n+114.0),f.x),
+					lerp( hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);
+}
+
+struct Boid
+{
+	float3 position;
+	float3 direction;
+	float noise_offset;
+	float speed;
+	float frame;
+	float next_frame;
+	float frame_interpolation;
+	float padding;
+};
+
+struct Affector
+{
+	float3 position;
+	float force;
+	float distance;
+};
+
+RWStructuredBuffer<Boid> boidBuffer;
+// RWStructuredBuffer<float3> affectorBuffer;
+RWStructuredBuffer<Affector> affectorBuffer;
+
+CBUFFER_START(Params)
+	float DeltaTime;
+	float RotationSpeed;
+	float BoidSpeed;
+	float BoidSpeedVariation;
+	float3 FlockPosition;
+	float NeighbourDistance;
+	uint BoidsCount;
+	float BoidFrameSpeed;
+	int NbFrames;
+	int NbAffectors;
+	float AffectorForce;
+	float AffectorDistance;
+CBUFFER_END
+
+[numthreads(GROUP_SIZE,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+	uint instanceId = id.x;
+	Boid boid = boidBuffer[instanceId];
+
+	float noise = clamp(noise1(_Time / 100.0 + boid.noise_offset), -1, 1) * 2.0 - 1.0;
+	float velocity = BoidSpeed * (1.0 + noise * BoidSpeedVariation);
+	
+	// Make slow birds go faster if far away from flock ?
+	float distance_from_flock = distance(boid.position, FlockPosition);
+	if (distance_from_flock > 50)
+		velocity += distance_from_flock / 50;
+	velocity += min(max(distance(boid.position, FlockPosition) / 50, 1), BoidSpeed * 200);
+
+	float3 boid_pos = boid.position;
+	float3 boid_dir = boid.direction;
+
+	float3 separation = float3(0, 0.0, 0);
+	float3 alignment = float3(0.0, 0.0, 0.0);
+	float3 cohesion = FlockPosition;
+
+	uint nearbyCount = 1; // Add self that is ignored in loop
+
+	for (uint i = 0; i < BoidsCount; i++) {
+		if (i == instanceId)
+			continue;
+			
+		if (distance(boid_pos, boidBuffer[i].position) < NeighbourDistance)
+		{
+			float3 tempBoid_position = boidBuffer[i].position;
+
+			float3 diff = boid_pos - tempBoid_position;
+			float diffLen = (length(diff));
+			float scaler = clamp(1.0 - diffLen / NeighbourDistance, 0.0, 1.0);
+			
+			separation += diff * (scaler / diffLen);
+			alignment += boidBuffer[i].direction;
+			cohesion += tempBoid_position;
+
+			nearbyCount += 1;
+		}
+	}
+
+	for (uint i = 0; i < NbAffectors; i++) {
+		Affector affector = affectorBuffer[i];
+		// We remove one axis to make a better drawing but ultimately if we want to avoid obstacles or get attracted by something we should use all 3 axis
+		float3 affector_position = FlockPosition - affector.position;
+		if (abs(boid_pos.x - FlockPosition.x) < 20 && distance(boid_pos.yz, affector_position.yz) < (affector.distance + AffectorDistance))
+		// if (distance(boid_pos, affector.position) < affector.distance)
+		{
+
+			float3 diff = boid_pos - float3(boid_pos.x, affector_position.y, affector_position.z);
+			// float3 diff = boid_pos - affector_position;
+			float diffLen = length(diff);
+			float scaler = clamp(1.0 - diffLen / (affector.force + AffectorForce), 0.0, 1.0);
+			
+			if (affector.force < 0)
+				separation += diff * (scaler / diffLen) * affector.force;
+			else
+				separation += diff * (scaler / diffLen);
+		}
+	}
+	
+
+	float avg = 1.0 / nearbyCount;
+	alignment *= avg;
+	cohesion *= avg;
+	cohesion = normalize(cohesion - boid_pos);
+
+	float3 direction = alignment + separation + cohesion;
+
+	float ip = exp(-RotationSpeed * DeltaTime);
+	boid.direction = lerp((direction), normalize(boid_dir), ip);
+
+	boid.position += (boid.direction) * (velocity * DeltaTime);
+
+	// Only change frame if diving or constant speed or random ?
+	// if (boid.direction.y > -0.25) 
+	float current_frame = (boid.frame + velocity * (DeltaTime * BoidFrameSpeed));
+	int current_frame_floor = trunc(current_frame);
+	boid.frame = current_frame;
+	boid.next_frame = current_frame_floor + 1;
+	boid.frame_interpolation = current_frame - current_frame_floor;
+	if (current_frame_floor >= NbFrames) {
+		boid.frame = 0;
+		boid.next_frame = 1;
+	}
+	else if (current_frame_floor >= NbFrames - 1)
+		boid.next_frame = 0;
+
+	boidBuffer[id.x] = boid;
+}

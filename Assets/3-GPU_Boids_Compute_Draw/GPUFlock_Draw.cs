@@ -81,7 +81,7 @@ public class GPUFlock_Draw : MonoBehaviour {
         _ComputeFlock.SetFloat("NeighbourDistance", NeighbourDistance);
         _ComputeFlock.SetInt("BoidsCount", BoidsCount);
         _ComputeFlock.SetBuffer(this.kernelHandle, "boidBuffer", BoidBuffer);
-        _ComputeFlock.Dispatch(this.kernelHandle, this.BoidsCount / GROUP_SIZE, 1, 1);
+        _ComputeFlock.Dispatch(this.kernelHandle, this.BoidsCount / GROUP_SIZE + 1, 1, 1);
 
         BoidMaterial.SetBuffer("boidBuffer", BoidBuffer);
         Graphics.DrawMeshInstancedIndirect(

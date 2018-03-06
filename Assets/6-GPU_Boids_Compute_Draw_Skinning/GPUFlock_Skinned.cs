@@ -98,7 +98,7 @@ public class GPUFlock_Skinned : MonoBehaviour {
         _ComputeFlock.SetInt("BoidsCount", BoidsCount);
         _ComputeFlock.SetInt("NbFrames", NbFrames);
         _ComputeFlock.SetBuffer(this.kernelHandle, "boidBuffer", BoidBuffer);
-        _ComputeFlock.Dispatch(this.kernelHandle, this.BoidsCount / GROUP_SIZE, 1, 1);
+        _ComputeFlock.Dispatch(this.kernelHandle, this.BoidsCount / GROUP_SIZE + 1, 1, 1);
 
         BoidMaterial.SetBuffer("boidBuffer", BoidBuffer);
 
@@ -128,7 +128,6 @@ public class GPUFlock_Skinned : MonoBehaviour {
         BoidSMR = TargetBoidToGPUSkin.GetComponentInChildren<SkinnedMeshRenderer>();
         _Animator = TargetBoidToGPUSkin.GetComponentInChildren<Animator>();
         int iLayer = 0;
-        float fNormalizedTime = .5f;
         AnimatorStateInfo aniStateInfo = _Animator.GetCurrentAnimatorStateInfo(iLayer);
 
         Mesh bakedMesh = new Mesh();

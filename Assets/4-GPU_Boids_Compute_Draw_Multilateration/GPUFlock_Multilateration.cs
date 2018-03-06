@@ -99,7 +99,7 @@ public class GPUFlock_Multilateration : MonoBehaviour {
         _ComputeFlock.SetFloat("NeighbourDistance", NeighbourDistance);
         
         _ComputeFlock.SetBuffer(this.kernelMoveHandle, "boidBuffer", BoidBuffer);
-        _ComputeFlock.Dispatch(this.kernelMoveHandle, this.BoidsCount / GROUP_SIZE, 1, 1);
+        _ComputeFlock.Dispatch(this.kernelMoveHandle, this.BoidsCount / GROUP_SIZE + 1, 1, 1);
 
         BoidMaterial.SetBuffer("boidBuffer", BoidBuffer);
         // BoidMaterial.SetMatrix("_LocalToWorld", transform.localToWorldMatrix);

@@ -214,7 +214,7 @@ public class GPUFlock_Draw_Bitonic : MonoBehaviour {
         _ComputeFlock.SetBuffer(this._kernelMove, "PositionRankedByDistance", PositionRankedByDistanceBuffer);
         _ComputeFlock.SetBuffer(this._kernelMove, "DirectionRankedByDistance", DirectionRankedByDistanceBuffer);
 
-        _ComputeFlock.Dispatch(this._kernelMove, BoidsCount / GROUP_SIZE, 1, 1);
+        _ComputeFlock.Dispatch(this._kernelMove, BoidsCount / GROUP_SIZE + 1, 1, 1);
 
         BoidMaterial.SetBuffer("boidBuffer", BoidBuffer);
         BoidMaterial.SetFloat("ModifierRotationMatrice", ModifierRotationMatrice);
