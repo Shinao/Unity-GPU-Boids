@@ -21,6 +21,7 @@ It contains several implementations to see how some compare to others, check out
 **Benchmarks**
 
 Using a GTX 980 Ti
+
 | Implementation | 1000 Boids | 4000 Boids | 32000 Boids
 | --- | :---: | :---: | :---:
 | **CPU Flock** | 20 FPS | 3 FPS | < 1 FPS
