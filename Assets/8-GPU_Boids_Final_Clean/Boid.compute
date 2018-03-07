@@ -1,5 +1,6 @@
 ﻿#pragma kernel CSMain
 #define GROUP_SIZE 256
+#define MAX_VELOCITY_ANIMATION_SPEED 12
 
 #include "UnityCG.cginc"
 
@@ -59,6 +60,7 @@ CBUFFER_START(Params)
 	uint NbAffectors;
 	float AffectorForce;
 	float AffectorDistance;
+	uint StepBoidCheckNeighbours;
 CBUFFER_END
 
 [numthreads(GROUP_SIZE,1,1)]
@@ -84,8 +86,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 	float3 cohesion = FlockPosition;
 
 	uint nearbyCount = 1; // Add self that is ignored in loop
-
-	for (uint i = 0; i < BoidsCount; i++) {
+	for (uint i = 0; i < BoidsCount; i += StepBoidCheckNeighbours) {
 		if (i == instanceId)
 			continue;
 			
@@ -140,7 +141,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
 	// Only change frame if diving or constant speed or random ?
 	// if (boid.direction.y > -0.25) 
-	float current_frame = (boid.frame + velocity * (DeltaTime * BoidFrameSpeed));
+	float current_frame = (boid.frame + min(velocity, MAX_VELOCITY_ANIMATION_SPEED) * (DeltaTime * BoidFrameSpeed));
 	int current_frame_floor = trunc(current_frame);
 	boid.frame = current_frame;
 	boid.next_frame = current_frame_floor + 1;

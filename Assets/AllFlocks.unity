@@ -351,6 +351,11 @@ Prefab:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 114680727272663940, guid: f20895eed6814d54286b056ca6164075,
+        type: 2}
+      propertyPath: spawnCount
+      value: 4000
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_ParentPrefab: {fileID: 100100000, guid: f20895eed6814d54286b056ca6164075, type: 2}
   m_IsPrefabParent: 0
@@ -511,7 +516,7 @@ Prefab:
     - target: {fileID: 114560575871380332, guid: 84b3d2fa605da494aaa25a296fbcef07,
         type: 2}
       propertyPath: BoidsCount
-      value: 1000
+      value: 32000
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_ParentPrefab: {fileID: 100100000, guid: 84b3d2fa605da494aaa25a296fbcef07, type: 2}
@@ -914,7 +919,7 @@ Prefab:
     - target: {fileID: 114181898955019144, guid: f75bad98ed152cb448fde3e0d9ce7391,
         type: 2}
       propertyPath: BoidsCount
-      value: 5000
+      value: 4000
       objectReference: {fileID: 0}
     - target: {fileID: 114181898955019144, guid: f75bad98ed152cb448fde3e0d9ce7391,
         type: 2}
@@ -979,7 +984,7 @@ Prefab:
       objectReference: {fileID: 0}
     - target: {fileID: 1852831396474288, guid: b6c9fe565aac792419d1d6e463362b48, type: 2}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1852831396474288, guid: b6c9fe565aac792419d1d6e463362b48, type: 2}
       propertyPath: m_Name
@@ -1021,12 +1026,14 @@ MonoBehaviour:
   BoidMesh: {fileID: 4300000, guid: 8ec9bd4530b42b446938d365f3bba972, type: 3}
   BoidMaterial: {fileID: 2100000, guid: f79a98ae65808b84c850013a4d6937aa, type: 2}
   _AnimationClip: {fileID: 7400000, guid: 8ec9bd4530b42b446938d365f3bba972, type: 3}
+  UseAffectors: 0
   DrawingAffectors: {fileID: 4900000, guid: ccec4b6811b96fc4090ba47d4c7ebf9e, type: 3}
   ScaleDrawingAffectors: 0.07
   ReverseYAxisDrawingAffectors: 0
   DrawingAffectorsOffset: {x: 0, y: 0, z: 0}
   DrawDrawingAffectors: 0
-  BoidsCount: 1000
+  BoidsCount: 16000
+  StepBoidCheckNeighbours: 1
   SpawnRadius: 10
   RotationSpeed: 4
   BoidSpeed: 6
@@ -1317,12 +1324,12 @@ Prefab:
       objectReference: {fileID: 0}
     - target: {fileID: 1331493369550274, guid: f9fb878926d060f4eada45010c37b753, type: 2}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 114819775174358322, guid: f9fb878926d060f4eada45010c37b753,
         type: 2}
       propertyPath: BoidsCount
-      value: 100
+      value: 4000
       objectReference: {fileID: 0}
     - target: {fileID: 114819775174358322, guid: f9fb878926d060f4eada45010c37b753,
         type: 2}
@@ -1378,7 +1385,7 @@ Prefab:
     - target: {fileID: 114533022375764708, guid: eceb7cc132a4f6b46b3569608ad62363,
         type: 2}
       propertyPath: BoidsCount
-      value: 1000
+      value: 4000
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_ParentPrefab: {fileID: 100100000, guid: eceb7cc132a4f6b46b3569608ad62363, type: 2}

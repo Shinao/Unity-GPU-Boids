@@ -33,6 +33,7 @@ public class GPUFlock : MonoBehaviour {
     public AnimationClip _AnimationClip;
     private int NbFramesInAnimation;
 
+    public bool UseAffectors;
     public TextAsset DrawingAffectors;
     public float ScaleDrawingAffectors = 0.03f;
     public bool ReverseYAxisDrawingAffectors = true;
@@ -41,6 +42,7 @@ public class GPUFlock : MonoBehaviour {
     private int NbAffectors = 0;
 
     public int BoidsCount;
+    public int StepBoidCheckNeighbours = 1;
     public float SpawnRadius;
     public float RotationSpeed = 4f;
     public float BoidSpeed = 6f;
@@ -82,9 +84,13 @@ public class GPUFlock : MonoBehaviour {
 
         GenerateSkinnedAnimationForGPUBuffer();
 
-        var dataToPaths = new PointsFromData();
-        dataToPaths.GetPointsFrom(DrawingAffectors, DrawingAffectorsOffset, new Vector3(0, 90, 0), ReverseYAxisDrawingAffectors, ScaleDrawingAffectors);
-        GenerateDrawingAffectors(dataToPaths.Points.ToArray());
+        if (UseAffectors) {
+            var dataToPaths = new PointsFromData();
+            dataToPaths.GetPointsFrom(DrawingAffectors, DrawingAffectorsOffset, new Vector3(0, 90, 0), ReverseYAxisDrawingAffectors, ScaleDrawingAffectors);
+            GenerateDrawingAffectors(dataToPaths.Points.ToArray());
+        }
+        else
+            AffectorBuffer = new ComputeBuffer(1, 20);
 
         SetComputeData();
         SetMaterialData();
@@ -146,6 +152,7 @@ public class GPUFlock : MonoBehaviour {
         _ComputeFlock.SetInt("NbAffectors", NbAffectors);
         _ComputeFlock.SetFloat("AffectorForce", AffectorForce);
         _ComputeFlock.SetFloat("AffectorDistance", AffectorDistance);
+        _ComputeFlock.SetInt("StepBoidCheckNeighbours", StepBoidCheckNeighbours);
         _ComputeFlock.SetBuffer(this.kernelHandle, "boidBuffer", BoidBuffer);
         _ComputeFlock.SetBuffer(this.kernelHandle, "affectorBuffer", AffectorBuffer);
     }

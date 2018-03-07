@@ -4,7 +4,8 @@ This project was made to learn from compute shaders and to have a reference for 
 It contains several implementations to see how some compare to others, check out the different folders in `Assets`.
 
 <p align="center">
-    <img src="docs/boids_implentations_preview.gif"/>
+    <!-- <img src="docs/boids_implentations_preview.gif"/> -->
+    <img src="docs/boids_preview.gif"/>
     <img src="docs/boids_affectors_preview.gif"/>
 </p>
 
