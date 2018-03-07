@@ -60,6 +60,7 @@ public class GPUFlock : MonoBehaviour {
     private ComputeBuffer AffectorBuffer;
     private ComputeBuffer VertexAnimationBuffer;
     private ComputeBuffer _drawArgsBuffer;
+    private Bounds InfiniteBounds = new Bounds(Vector3.zero, Vector3.one * 99999);
 
     private const int THREAD_GROUP_SIZE = 256;
 
@@ -169,6 +170,7 @@ public class GPUFlock : MonoBehaviour {
     }
 
 
+    // Execution order should be the lowest possible
     void Update() {
     #if UNITY_EDITOR
         SetComputeData();
@@ -177,11 +179,11 @@ public class GPUFlock : MonoBehaviour {
 
         _ComputeFlock.Dispatch(this.kernelHandle, this.BoidsCount / THREAD_GROUP_SIZE + 1, 1, 1);
 
-        Graphics.DrawMeshInstancedIndirect(
-            BoidMesh, 0, BoidMaterial,
-            new Bounds(Vector3.zero, Vector3.one * 1000),
-            _drawArgsBuffer, 0
-        );
+        GL.Flush(); // Make sure our Dispatch() execute right now
+    }
+
+    void LateUpdate() {
+        Graphics.DrawMeshInstancedIndirect(BoidMesh, 0, BoidMaterial, InfiniteBounds, _drawArgsBuffer, 0);
     }
 
     void OnDestroy()

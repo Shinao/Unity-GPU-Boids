@@ -1032,7 +1032,7 @@ MonoBehaviour:
   ReverseYAxisDrawingAffectors: 0
   DrawingAffectorsOffset: {x: 0, y: 0, z: 0}
   DrawDrawingAffectors: 0
-  BoidsCount: 16000
+  BoidsCount: 32000
   StepBoidCheckNeighbours: 1
   SpawnRadius: 10
   RotationSpeed: 4
