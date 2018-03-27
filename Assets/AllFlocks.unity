@@ -868,22 +868,22 @@ Prefab:
       objectReference: {fileID: 0}
     - target: {fileID: 1366668784460374, guid: 84b3d2fa605da494aaa25a296fbcef07, type: 2}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 114560575871380332, guid: 84b3d2fa605da494aaa25a296fbcef07,
         type: 2}
       propertyPath: BoidsCount
-      value: 1000
+      value: 32000
       objectReference: {fileID: 0}
     - target: {fileID: 114560575871380332, guid: 84b3d2fa605da494aaa25a296fbcef07,
         type: 2}
       propertyPath: StepBoidsDispatch
-      value: 10000
+      value: 1000
       objectReference: {fileID: 0}
     - target: {fileID: 114560575871380332, guid: 84b3d2fa605da494aaa25a296fbcef07,
         type: 2}
       propertyPath: NeighbourDistance
-      value: 10
+      value: 2
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_ParentPrefab: {fileID: 100100000, guid: 84b3d2fa605da494aaa25a296fbcef07, type: 2}
@@ -1570,7 +1570,7 @@ Prefab:
       objectReference: {fileID: 0}
     - target: {fileID: 1852831396474288, guid: b6c9fe565aac792419d1d6e463362b48, type: 2}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1852831396474288, guid: b6c9fe565aac792419d1d6e463362b48, type: 2}
       propertyPath: m_Name
@@ -1612,7 +1612,7 @@ MonoBehaviour:
   BoidMesh: {fileID: 4300000, guid: 8ec9bd4530b42b446938d365f3bba972, type: 3}
   BoidMaterial: {fileID: 2100000, guid: f79a98ae65808b84c850013a4d6937aa, type: 2}
   _AnimationClip: {fileID: 7400000, guid: 8ec9bd4530b42b446938d365f3bba972, type: 3}
-  UseAffectors: 1
+  UseAffectors: 0
   DrawingAffectors: {fileID: 4900000, guid: ccec4b6811b96fc4090ba47d4c7ebf9e, type: 3}
   UseMeshAffectors: 0
   MeshAffectors: {fileID: 4300006, guid: 0c846b04a8faeab419e931d90a057ede, type: 3}

@@ -66,19 +66,15 @@ CBUFFER_START(Params)
 	float MaxAffectorFullAxisSize = 20;
 CBUFFER_END
 
-groupshared float3 LocalBoids[2000];
-
 [numthreads(GROUP_SIZE,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
 	uint instanceId = id.x;
 	Boid boid = boidBuffer[instanceId];
 
-	LocalBoids[instanceId] = instanceId;
-
 	GroupMemoryBarrierWithGroupSync();
 
-	float noise = clamp(noise1(_Time / 100.0 + boid.noise_offset), -1, 1) * 2.0 - 1.0 + LocalBoids[instanceId + 2];
+	float noise = clamp(noise1(_Time / 100.0 + boid.noise_offset), -1, 1) * 2.0 - 1.0;
 	float velocity = BoidSpeed * (1.0 + noise * BoidSpeedVariation);
 	
 	// Make slow birds go faster if far away from flock ?
