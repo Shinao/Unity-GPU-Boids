@@ -1,6 +1,7 @@
 ﻿#pragma kernel CSMain
 #define GROUP_SIZE 256
 #define MAX_VELOCITY_ANIMATION_SPEED 12
+#define MAX_RANGE_BOID_AFFECTED_FROM_AFFECTOR_FROM_FLOCK 20
 
 #include "UnityCG.cginc"
 
@@ -41,10 +42,11 @@ struct Affector
 	float3 position;
 	float force;
 	float distance;
+	uint axis;
+	float2 padding;
 };
 
 RWStructuredBuffer<Boid> boidBuffer;
-// RWStructuredBuffer<float3> affectorBuffer;
 RWStructuredBuffer<Affector> affectorBuffer;
 
 CBUFFER_START(Params)
@@ -61,7 +63,10 @@ CBUFFER_START(Params)
 	float AffectorForce;
 	float AffectorDistance;
 	uint StepBoidCheckNeighbours;
+	float MaxAffectorFullAxisSize = 20;
 CBUFFER_END
+
+groupshared float3 LocalBoids[2000];
 
 [numthreads(GROUP_SIZE,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
@@ -69,7 +74,11 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 	uint instanceId = id.x;
 	Boid boid = boidBuffer[instanceId];
 
-	float noise = clamp(noise1(_Time / 100.0 + boid.noise_offset), -1, 1) * 2.0 - 1.0;
+	LocalBoids[instanceId] = instanceId;
+
+	GroupMemoryBarrierWithGroupSync();
+
+	float noise = clamp(noise1(_Time / 100.0 + boid.noise_offset), -1, 1) * 2.0 - 1.0 + LocalBoids[instanceId + 2];
 	float velocity = BoidSpeed * (1.0 + noise * BoidSpeedVariation);
 	
 	// Make slow birds go faster if far away from flock ?
@@ -106,21 +115,38 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 		}
 	}
 
+	float3 diff = 0;
 	for (i = 0; i < NbAffectors; i++) {
 		Affector affector = affectorBuffer[i];
-		// We remove one axis to make a better drawing but ultimately if we want to avoid obstacles or get attracted by something we should use all 3 axis
-		float3 affector_position = FlockPosition - affector.position;
-		if (abs(boid_pos.x - FlockPosition.x) < 20 && distance(boid_pos.yz, affector_position.yz) < (affector.distance + AffectorDistance))
-		// if (distance(boid_pos, affector.position) < affector.distance)
+		bool boidWithinRangeOfAffector = false;
+		float3 affector_relative_position = FlockPosition - affector.position;
+		if (affector.axis == 3)
 		{
+			if (distance(boid_pos, affector_relative_position) < affector.distance + AffectorDistance) {
+				boidWithinRangeOfAffector = true;
+				diff = boid_pos - affector_relative_position;
+			}
+		}
+		else // We remove one axis to make a better drawing
+		{
+			uint first_axis_check = (affector.axis + 1) % 3;
+			uint second_axis_check = (affector.axis + 2) % 3;
+			float2 boid_pos_check = float2(boid_pos[first_axis_check], boid_pos[second_axis_check]);
+			float2 affector_pos_check = float2(affector_relative_position[first_axis_check], affector_relative_position[second_axis_check]);
+			if (abs(boid_pos[affector.axis] - FlockPosition[affector.axis]) < MaxAffectorFullAxisSize && distance(boid_pos_check, affector_pos_check) < (affector.distance + AffectorDistance)) {
+				boidWithinRangeOfAffector = true;
+				diff = boid_pos - float3(boid_pos[affector.axis], affector_relative_position[first_axis_check], affector_relative_position[second_axis_check]);
+			}
+		}
 
-			float3 diff = boid_pos - float3(boid_pos.x, affector_position.y, affector_position.z);
-			// float3 diff = boid_pos - affector_position;
+		if (boidWithinRangeOfAffector)
+		{
+			float affector_force = (affector.force + AffectorForce);
 			float diffLen = length(diff);
-			float scaler = clamp(1.0 - diffLen / (affector.force + AffectorForce), 0.0, 1.0);
+			float scaler = clamp(1.0 - diffLen / affector_force, 0.0, 1.0);
 			
-			if (affector.force < 0)
-				separation += diff * (scaler / diffLen) * affector.force;
+			if (affector_force < 0)
+				separation += diff * (scaler / diffLen) * affector_force;
 			else
 				separation += diff * (scaler / diffLen);
 		}

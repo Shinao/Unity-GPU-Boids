@@ -18,7 +18,7 @@ public class PointsFromData {
     /// </summary>
     /// <param name="assetDataPoints">Asset file containing path of points (see https://shinao.github.io/PathToPoints/)</param>
     /// <param name="initialPosition">Initial position of all the branches</param>
-	public void GetPointsFrom(TextAsset assetDataPoints, Vector3 initialPosition, Vector3 rotationAngles, bool reverseYAxis = true, float scale = 0.03f) {
+	public void GeneratePointsFrom(TextAsset assetDataPoints, Vector3 initialPosition, Vector3 rotationAngles, bool reverseYAxis = true, float scale = 0.03f) {
 		Scale = scale;
 		RotationAngles = rotationAngles;
 		ReverseYAxis = reverseYAxis;

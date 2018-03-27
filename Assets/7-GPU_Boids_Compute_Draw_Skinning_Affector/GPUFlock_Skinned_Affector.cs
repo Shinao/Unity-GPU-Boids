@@ -3,25 +3,25 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
 
-public struct GPUBoid_Skinned_Affector
-{
-    public Vector3 position;
-    public Vector3 direction;
-    public float noise_offset;
-    public float speed;
-    public float frame;
-    public float next_frame;
-    public float frame_interpolation;
-    public float padding;
-}
-
-public struct GPUBoidAffector {
-    public Vector3 position;
-    public float force;
-    public float distance;
-}
-
 public class GPUFlock_Skinned_Affector : MonoBehaviour {
+    public struct GPUBoid_Skinned_Affector
+    {
+        public Vector3 position;
+        public Vector3 direction;
+        public float noise_offset;
+        public float speed;
+        public float frame;
+        public float next_frame;
+        public float frame_interpolation;
+        public float padding;
+    }
+
+    public struct GPUBoidAffector {
+        public Vector3 position;
+        public float force;
+        public float distance;
+    }
+
     public ComputeShader _ComputeFlock;
 
     private SkinnedMeshRenderer BoidSMR;
@@ -70,7 +70,7 @@ public class GPUFlock_Skinned_Affector : MonoBehaviour {
         GenerateSkinnedAnimationForGPUBuffer();
 
         var dataToPaths = new PointsFromData();
-        dataToPaths.GetPointsFrom(DrawingAffectors, DrawingAffectorsOffset, new Vector3(0, 90, 0), ReverseYAxisDrawingAffectors, ScaleDrawingAffectors);
+        dataToPaths.GeneratePointsFrom(DrawingAffectors, DrawingAffectorsOffset, new Vector3(0, 90, 0), ReverseYAxisDrawingAffectors, ScaleDrawingAffectors);
         GenerateDrawingAffectors(dataToPaths.Points.ToArray(), 2, 2);
     }
 

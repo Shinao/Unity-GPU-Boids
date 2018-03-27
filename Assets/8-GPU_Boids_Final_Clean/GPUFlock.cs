@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 public class GPUFlock : MonoBehaviour {
     public struct GPUBoid
@@ -20,6 +21,8 @@ public class GPUFlock : MonoBehaviour {
         public Vector3 position;
         public float force;
         public float distance;
+        public int axis;
+        public Vector2 padding;
     }
 
     public ComputeShader _ComputeFlock;
@@ -35,6 +38,8 @@ public class GPUFlock : MonoBehaviour {
 
     public bool UseAffectors;
     public TextAsset DrawingAffectors;
+    public bool UseMeshAffectors = false;
+    public Mesh MeshAffectors;    
     public float ScaleDrawingAffectors = 0.03f;
     public bool ReverseYAxisDrawingAffectors = true;
     public Vector3 DrawingAffectorsOffset;
@@ -52,15 +57,16 @@ public class GPUFlock : MonoBehaviour {
     public bool FrameInterpolation = true;
     public float AffectorForce = 2f;
     public float AffectorDistance = 2f;
+    public float MaxAffectorFullAxisSize = 20f;
     private GPUBoid[] boidsData;
-    private GPUBoidAffector[] Affectors = new GPUBoidAffector[1];
+    private GPUAffector[] Affectors = new GPUAffector[1];
 
     private int kernelHandle;
     private ComputeBuffer BoidBuffer;
     private ComputeBuffer AffectorBuffer;
     private ComputeBuffer VertexAnimationBuffer;
     private ComputeBuffer _drawArgsBuffer;
-    private Bounds InfiniteBounds = new Bounds(Vector3.zero, Vector3.one * 99999);
+    private Bounds InfiniteBounds = new Bounds(Vector3.zero, Vector3.one * 9999);
 
     private const int THREAD_GROUP_SIZE = 256;
 
@@ -80,22 +86,63 @@ public class GPUFlock : MonoBehaviour {
         for (int i = 0; i < this.BoidsCount; i++)
             this.boidsData[i] = this.CreateBoidData();
 
-        BoidBuffer = new ComputeBuffer(BoidsCount, 48);
+        BoidBuffer = new ComputeBuffer(BoidsCount, Marshal.SizeOf(typeof(GPUBoid)));
         BoidBuffer.SetData(this.boidsData);
 
         GenerateSkinnedAnimationForGPUBuffer();
 
         if (UseAffectors) {
-            var dataToPaths = new PointsFromData();
-            dataToPaths.GetPointsFrom(DrawingAffectors, DrawingAffectorsOffset, new Vector3(0, 90, 0), ReverseYAxisDrawingAffectors, ScaleDrawingAffectors);
-            GenerateDrawingAffectors(dataToPaths.Points.ToArray());
+            if (UseMeshAffectors) {
+                var bounds = MeshAffectors.bounds;
+                var scaledVertices = MeshAffectors.vertices.Select(v => (v) * ScaleDrawingAffectors + DrawingAffectorsOffset).ToArray();
+                Debug.Log(scaledVertices[0]);
+                GenerateDrawingAffectors(scaledVertices, 0, 0, 3);
+            }
+            else {
+                var dataToPaths = new PointsFromData();
+                dataToPaths.GeneratePointsFrom(DrawingAffectors, DrawingAffectorsOffset, new Vector3(0, 90, 0), ReverseYAxisDrawingAffectors, ScaleDrawingAffectors);
+                GenerateDrawingAffectors(dataToPaths.Points.ToArray());
+            }
         }
         else
-            AffectorBuffer = new ComputeBuffer(1, 20);
+            AffectorBuffer = new ComputeBuffer(1, Marshal.SizeOf(typeof(GPUAffector)));
 
         SetComputeData();
         SetMaterialData();
+
+        if (DrawILoveUnity)
+            StartCoroutine(DrawILoveUnityForever());
     }
+
+    public bool DrawILoveUnity = false;
+    public TextAsset EyeDrawing;
+    public TextAsset HeartDrawing;
+    public TextAsset UnityDrawing;
+    IEnumerator DrawILoveUnityForever() {
+        var dataToPaths = new PointsFromData();
+        dataToPaths.GeneratePointsFrom(EyeDrawing, new Vector3(0, 2, -2), new Vector3(0, 90, 0), ReverseYAxisDrawingAffectors, 0.03f);
+        var eyePoints = dataToPaths.Points.ToArray();
+        dataToPaths.GeneratePointsFrom(HeartDrawing, new Vector3(0, 2, -2), new Vector3(0, 90, 0), ReverseYAxisDrawingAffectors, 0.05f);
+        var heartPoints = dataToPaths.Points.ToArray();
+        dataToPaths.GeneratePointsFrom(UnityDrawing, new Vector3(0, 0, -1), new Vector3(0, 90, 0), ReverseYAxisDrawingAffectors, 0.1f);
+        var unityPoints = dataToPaths.Points.ToArray();
+        yield return new WaitForSeconds(7f);
+        while (true) {
+            GenerateDrawingAffectors(eyePoints, 4, 2, 0);
+            yield return new WaitForSeconds(3f);
+            GenerateDrawingAffectors(new Vector3[1], 0, 0, 0);
+            yield return new WaitForSeconds(0.5f);
+            GenerateDrawingAffectors(heartPoints, 4, 2, 0);
+            yield return new WaitForSeconds(3f);
+            GenerateDrawingAffectors(new Vector3[1], 0, 0, 0);
+            yield return new WaitForSeconds(0.5f);
+            GenerateDrawingAffectors(unityPoints, 6, 2, 0);
+            yield return new WaitForSeconds(4f);
+            GenerateDrawingAffectors(new Vector3[1], 0, 0, 0);
+            yield return new WaitForSeconds(2f);
+        }
+    }
+
 
     GPUBoid CreateBoidData()
     {
@@ -110,21 +157,21 @@ public class GPUFlock : MonoBehaviour {
         return boidData;
     }
 
-    private void GenerateDrawingAffectors(Vector3[] points) {
+    private void GenerateDrawingAffectors(Vector3[] points, float force = 0, float distance = 0, int axis = 0) {
         if (AffectorBuffer != null)
             AffectorBuffer.Release();
 
-        System.Array.Resize(ref Affectors, NbAffectors + points.Length);
+        NbAffectors = points.Length;
+        System.Array.Resize(ref Affectors, NbAffectors);
 
-        var new_affectors = points.Select(p => {
-            var affector = new GPUBoidAffector();
+        Affectors = points.Select(p => {
+            var affector = new GPUAffector();
             affector.position = p;
-            affector.force = 0;
-            affector.distance = 0;
+            affector.force = force;
+            affector.distance = distance;
+            affector.axis = axis;
             return affector;
         }).ToArray();
-
-        System.Array.Copy(new_affectors, 0, Affectors, NbAffectors, new_affectors.Length);
 
         if (DrawDrawingAffectors) {
             foreach(var point in points) {
@@ -134,9 +181,7 @@ public class GPUFlock : MonoBehaviour {
             }
         }
 
-        NbAffectors += points.Length;
-
-        AffectorBuffer = new ComputeBuffer(NbAffectors, 20);
+        AffectorBuffer = new ComputeBuffer(NbAffectors, Marshal.SizeOf(typeof(GPUAffector)));
         AffectorBuffer.SetData(Affectors);
     }
 
@@ -153,6 +198,7 @@ public class GPUFlock : MonoBehaviour {
         _ComputeFlock.SetInt("NbAffectors", NbAffectors);
         _ComputeFlock.SetFloat("AffectorForce", AffectorForce);
         _ComputeFlock.SetFloat("AffectorDistance", AffectorDistance);
+        _ComputeFlock.SetFloat("MaxAffectorFullAxisSize", MaxAffectorFullAxisSize);
         _ComputeFlock.SetInt("StepBoidCheckNeighbours", StepBoidCheckNeighbours);
         _ComputeFlock.SetBuffer(this.kernelHandle, "boidBuffer", BoidBuffer);
         _ComputeFlock.SetBuffer(this.kernelHandle, "affectorBuffer", AffectorBuffer);
@@ -196,6 +242,11 @@ public class GPUFlock : MonoBehaviour {
 
     private void GenerateSkinnedAnimationForGPUBuffer()
     {
+        if (_AnimationClip == null) {
+            CreateOneFrameAnimationData();
+            return;
+        }
+
         BoidSMR = TargetBoidToGPUSkin.GetComponentInChildren<SkinnedMeshRenderer>();
         _Animator = TargetBoidToGPUSkin.GetComponentInChildren<Animator>();
         int iLayer = 0;
@@ -209,7 +260,7 @@ public class GPUFlock : MonoBehaviour {
         perFrameTime = _AnimationClip.length / NbFramesInAnimation;
 
         var vertexCount = BoidSMR.sharedMesh.vertexCount;
-        VertexAnimationBuffer = new ComputeBuffer(vertexCount * NbFramesInAnimation, 16);
+        VertexAnimationBuffer = new ComputeBuffer(vertexCount * NbFramesInAnimation, Marshal.SizeOf(typeof(Vector4)));
         Vector4[] vertexAnimationData = new Vector4[vertexCount * NbFramesInAnimation];
         for (int i = 0; i < NbFramesInAnimation; i++)
         {
@@ -230,6 +281,19 @@ public class GPUFlock : MonoBehaviour {
         VertexAnimationBuffer.SetData(vertexAnimationData);
         BoidMaterial.SetBuffer("vertexAnimation", VertexAnimationBuffer);
 
+        TargetBoidToGPUSkin.SetActive(false);
+    }
+
+    private void CreateOneFrameAnimationData() {
+        var vertexCount = BoidMesh.vertexCount;
+        NbFramesInAnimation = 1;
+        Vector4[] vertexAnimationData = new Vector4[vertexCount * NbFramesInAnimation];
+        VertexAnimationBuffer = new ComputeBuffer(vertexCount * NbFramesInAnimation, Marshal.SizeOf(typeof(Vector4)));
+        for(int j = 0; j < vertexCount; j++)
+            vertexAnimationData[(j * NbFramesInAnimation)] = BoidMesh.vertices[j];
+
+        VertexAnimationBuffer.SetData(vertexAnimationData);
+        BoidMaterial.SetBuffer("vertexAnimation", VertexAnimationBuffer);
         TargetBoidToGPUSkin.SetActive(false);
     }
 }
