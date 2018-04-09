@@ -111,11 +111,6 @@ void Move(uint3 id : SV_DispatchThreadID)
 
 	int nearbyCount = 1; // Add self that is ignored in loop
 
-	if (_Time.y == 0)
-		TestBuffer[instanceId] = 2;
-	else
-		TestBuffer[instanceId] = _Time.y;
-
 	//// Binary search on our bitonic sorting
 	uint boidRank = ValueIdxToKeyIdx[instanceId];
 	float minDistanceToBoid = boid_distance_to_station - NeighbourDistance;
@@ -131,8 +126,8 @@ void Move(uint3 id : SV_DispatchThreadID)
 	//// For some reason this one is slower above 16k BoidsCount but faster below (Memory cache reached on GPU per thread? I have no idea)
 	//// For 32k boids this will loop for around ~4k (Max 10k depending on boid position)
 	////////
-	// for (uint i = 0; i < BoidsCount; i++) { // Faster : Use a constant of iterations each frame seems better than to change it even if it's 10x less...
-	for (uint i = rankMinDistance; i < rankMaxDistancePlusOne; i++) { // Same behaviour but slower though less iterations...
+	for (uint i = 0; i < BoidsCount; i++) { // Faster : Use a constant of iterations each frame seems better than to change it even if it's 10x less...
+	// for (uint i = rankMinDistance; i < rankMaxDistancePlusOne; i++) { // Same behaviour but slower though less iterations...
 		if (i == boidRank)
 			continue;
 	

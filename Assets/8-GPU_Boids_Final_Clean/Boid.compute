@@ -72,8 +72,6 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 	uint instanceId = id.x;
 	Boid boid = boidBuffer[instanceId];
 
-	GroupMemoryBarrierWithGroupSync();
-
 	float noise = clamp(noise1(_Time / 100.0 + boid.noise_offset), -1, 1) * 2.0 - 1.0;
 	float velocity = BoidSpeed * (1.0 + noise * BoidSpeedVariation);
 	
@@ -91,7 +89,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 	float3 cohesion = FlockPosition;
 
 	uint nearbyCount = 1; // Add self that is ignored in loop
-	for (uint i = 0; i < BoidsCount; i += StepBoidCheckNeighbours) {
+	for (uint i = 0; i < BoidsCount; i++) {
 		if (i == instanceId)
 			continue;
 			

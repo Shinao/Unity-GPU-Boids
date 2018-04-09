@@ -125,7 +125,6 @@ public class GPUFlock_Draw_Bitonic : MonoBehaviour {
     public float BoidSpeed = 1f;
     public float NeighbourDistance = 1f;
     public float BoidSpeedVariation = 1f;
-    public float ModifierRotationMatrice = 1.0f;
     // Test variables debug compute
     public float Test = 1.0f;
     public List<Vector4> ListOfDistances = new List<Vector4>();
@@ -168,7 +167,7 @@ public class GPUFlock_Draw_Bitonic : MonoBehaviour {
         _ComputeFlock.SetBuffer(this._kernelPrepareNextFrame, BUF_KEYS, keysBuffer);
         _ComputeFlock.SetBuffer(this._kernelPrepareNextFrame, "PositionRankedByDistance", PositionRankedByDistanceBuffer);
         _ComputeFlock.SetBuffer(this._kernelPrepareNextFrame, "DirectionRankedByDistance", DirectionRankedByDistanceBuffer);
-        _ComputeFlock.Dispatch(this._kernelPrepareNextFrame, this.BoidsCount / GROUP_SIZE, 1, 1);
+        _ComputeFlock.Dispatch(this._kernelPrepareNextFrame, this.BoidsCount / GROUP_SIZE + 1, 1, 1);
 
 
         // var key_data = new uint[BoidsCount];
@@ -217,7 +216,6 @@ public class GPUFlock_Draw_Bitonic : MonoBehaviour {
         _ComputeFlock.Dispatch(this._kernelMove, BoidsCount / GROUP_SIZE + 1, 1, 1);
 
         BoidMaterial.SetBuffer("boidBuffer", BoidBuffer);
-        BoidMaterial.SetFloat("ModifierRotationMatrice", ModifierRotationMatrice);
         BoidMaterial.SetFloat("Test", Test);
         // BoidMaterial.SetMatrix("_LocalToWorld", transform.localToWorldMatrix);
         // BoidMaterial.SetMatrix("_WorldToLocal", transform.worldToLocalMatrix);
@@ -226,8 +224,6 @@ public class GPUFlock_Draw_Bitonic : MonoBehaviour {
             new Bounds(Vector3.zero, Vector3.one * 1000),
             _drawArgsBuffer, 0, _props
         );
-
-
     }
 
     public const int GROUP_SIZE = 256;

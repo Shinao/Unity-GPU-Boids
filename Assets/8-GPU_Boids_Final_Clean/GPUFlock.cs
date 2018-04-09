@@ -94,8 +94,7 @@ public class GPUFlock : MonoBehaviour {
         if (UseAffectors) {
             if (UseMeshAffectors) {
                 var bounds = MeshAffectors.bounds;
-                var scaledVertices = MeshAffectors.vertices.Select(v => (v) * ScaleDrawingAffectors + DrawingAffectorsOffset).ToArray();
-                Debug.Log(scaledVertices[0]);
+                var scaledVertices = MeshAffectors.vertices.Select(v => (v) * (ReverseYAxisDrawingAffectors ? -1 : 1)  * ScaleDrawingAffectors + DrawingAffectorsOffset).ToArray();
                 GenerateDrawingAffectors(scaledVertices, 0, 0, 3);
             }
             else {
@@ -126,23 +125,22 @@ public class GPUFlock : MonoBehaviour {
         var heartPoints = dataToPaths.Points.ToArray();
         dataToPaths.GeneratePointsFrom(UnityDrawing, new Vector3(0, 0, -1), new Vector3(0, 90, 0), ReverseYAxisDrawingAffectors, 0.1f);
         var unityPoints = dataToPaths.Points.ToArray();
-        yield return new WaitForSeconds(7f);
+        yield return new WaitForSeconds(3f);
         while (true) {
-            GenerateDrawingAffectors(eyePoints, 4, 2, 0);
+            GenerateDrawingAffectors(eyePoints, 0, 0, 0);
             yield return new WaitForSeconds(3f);
             GenerateDrawingAffectors(new Vector3[1], 0, 0, 0);
             yield return new WaitForSeconds(0.5f);
-            GenerateDrawingAffectors(heartPoints, 4, 2, 0);
+            GenerateDrawingAffectors(heartPoints, 0, 0, 0);
             yield return new WaitForSeconds(3f);
             GenerateDrawingAffectors(new Vector3[1], 0, 0, 0);
             yield return new WaitForSeconds(0.5f);
-            GenerateDrawingAffectors(unityPoints, 6, 2, 0);
+            GenerateDrawingAffectors(unityPoints, 2, 0, 0);
             yield return new WaitForSeconds(4f);
             GenerateDrawingAffectors(new Vector3[1], 0, 0, 0);
             yield return new WaitForSeconds(2f);
         }
     }
-
 
     GPUBoid CreateBoidData()
     {
@@ -228,6 +226,7 @@ public class GPUFlock : MonoBehaviour {
         GL.Flush(); // Make sure our Dispatch() execute right now
     }
 
+    // Execution order should be the highest possible
     void LateUpdate() {
         Graphics.DrawMeshInstancedIndirect(BoidMesh, 0, BoidMaterial, InfiniteBounds, _drawArgsBuffer, 0);
     }

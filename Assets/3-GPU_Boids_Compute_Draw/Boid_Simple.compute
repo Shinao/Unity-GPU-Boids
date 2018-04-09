@@ -28,7 +28,7 @@ struct Boid
 	float3 position;
 	float3 direction;
 	float noise_offset;
-	float3 padding; // Weirdly if I align to 16 bytes it's worse I have to add 8 additional bytes... something funky here
+	float3 padding;
 };
 
 RWStructuredBuffer<Boid> boidBuffer;
