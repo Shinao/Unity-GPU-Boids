@@ -496,12 +496,12 @@ Prefab:
       objectReference: {fileID: 0}
     - target: {fileID: 1366668784460374, guid: 84b3d2fa605da494aaa25a296fbcef07, type: 2}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 114560575871380332, guid: 84b3d2fa605da494aaa25a296fbcef07,
         type: 2}
       propertyPath: BoidsCount
-      value: 16000
+      value: 4200
       objectReference: {fileID: 0}
     - target: {fileID: 114560575871380332, guid: 84b3d2fa605da494aaa25a296fbcef07,
         type: 2}
