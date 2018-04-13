@@ -72,6 +72,8 @@ public class GPUFlock : MonoBehaviour {
 
     void Start()
     {
+        BoidMaterial = new Material(BoidMaterial);
+        
         _drawArgsBuffer = new ComputeBuffer(
             1, 5 * sizeof(uint), ComputeBufferType.IndirectArguments
         );
